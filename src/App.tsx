@@ -112,14 +112,20 @@ export default function App() {
       // Use html2canvas with CORS support for Leaflet tiles
       const canvas = await html2canvas(mapRef.current, {
         useCORS: true,
-        allowTaint: true,
+        allowTaint: false, // Changed to false for better compatibility with some browsers
         backgroundColor: '#ffffff',
-        scale: 2 // Higher quality
+        scale: 2,
+        logging: false,
       });
       const imgData = canvas.toDataURL('image/png');
       
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
+      
+      // Calculate aspect ratio to avoid distortion
+      const imgProps = pdf.getImageProperties(imgData);
+      const pdfWidth = 170;
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
       
       // --- Header & Branding ---
       pdf.setFillColor(220, 38, 38); // red-600
@@ -138,29 +144,31 @@ export default function App() {
       
       // --- Map Image ---
       pdf.setDrawColor(226, 232, 240); // slate-200
-      pdf.rect(18, 63, 174, 104);
-      pdf.addImage(imgData, 'PNG', 20, 65, 170, 100);
+      // Adjust box height based on calculated image height
+      pdf.rect(18, 63, 174, pdfHeight + 4);
+      pdf.addImage(imgData, 'PNG', 20, 65, pdfWidth, pdfHeight);
       pdf.setFontSize(8);
-      pdf.text('Kartenausschnitt der gemeldeten Punkte', 20, 168);
+      pdf.text('Kartenausschnitt der gemeldeten Punkte', 20, 65 + pdfHeight + 3);
 
       // --- Blank Form Section (For manual filling) ---
+      const formStartY = 65 + pdfHeight + 12;
       pdf.setFontSize(12);
       pdf.setFont('helvetica', 'bold');
       pdf.setTextColor(15, 23, 42);
-      pdf.text('Beteiligungsbogen', 20, 180);
+      pdf.text('Beteiligungsbogen', 20, formStartY);
 
       pdf.setFontSize(8);
       pdf.setFont('helvetica', 'normal');
       pdf.setTextColor(100, 116, 139);
       const instructionText = 'Zeichne deinen Schulweg auf der Karte oben nach. Benutze einen grünen Stift für Wege, auf denen du dich wohlfühlst, und einen roten Stift für Stellen, an denen du dich unwohl fühlst. Schreibe hier unten auf, warum das so ist.';
       const splitInstructions = pdf.splitTextToSize(instructionText, 170);
-      pdf.text(splitInstructions, 20, 186);
+      pdf.text(splitInstructions, 20, formStartY + 6);
 
       pdf.setFontSize(9);
-      const labelY = 186 + (splitInstructions.length * 4);
+      const labelY = formStartY + 6 + (splitInstructions.length * 4);
       pdf.text('Warum hast du diese Stellen so markiert? (Beschreibung):', 20, labelY);
       // Box from labelY + 2 to 275 (1cm before footer at 285)
-      pdf.rect(20, labelY + 2, 170, 275 - (labelY + 2)); 
+      pdf.rect(20, labelY + 2, 170, Math.max(40, 275 - (labelY + 2))); 
 
       // --- Reports Section (If any exist) ---
       if (reports.length > 0) {
@@ -255,11 +263,11 @@ export default function App() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 max-w-7xl mx-auto w-full p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <main className="flex-1 max-w-7xl mx-auto w-full p-4 md:p-6 grid grid-cols-1 md:grid-cols-12 gap-6">
         
         {/* Left Column: Map */}
-        <div className="lg:col-span-8 flex flex-col gap-6">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex-1 min-h-[500px] relative">
+        <div className="md:col-span-7 lg:col-span-8 flex flex-col gap-6">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex-1 min-h-[400px] md:min-h-[500px] relative">
             <div ref={mapRef} className="absolute inset-0">
               <MapContainer center={defaultCenter} zoom={15} scrollWheelZoom={true}>
                 <TileLayer
@@ -295,7 +303,7 @@ export default function App() {
         </div>
 
         {/* Right Column: Marker Management */}
-        <div className="lg:col-span-4 flex flex-col gap-6">
+        <div className="md:col-span-5 lg:col-span-4 flex flex-col gap-6">
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
             <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
               <MapPin className="w-5 h-5 text-red-600" />
