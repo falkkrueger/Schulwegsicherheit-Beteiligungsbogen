@@ -1,5 +1,5 @@
 {
   "name": "Schulwegsicherheit Kirchlengern",
-  "description": "Bürgerbeteiligungs-Plattform zur Erfassung von Gefahrenstellen auf Schulwegen. Unterstützt digitale Meldungen und KI-gestützte Digitalisierung von analogen Karten.",
-  "requestFramePermissions": ["camera", "geolocation"]
+  "description": "Tool zur Erstellung von Beteiligungsbögen für die Schulwegsicherheit. Markieren Sie Orte auf der Karte und generieren Sie ein PDF-Dokument.",
+  "requestFramePermissions": ["geolocation"]
 }

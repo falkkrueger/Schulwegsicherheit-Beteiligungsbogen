@@ -10,23 +10,14 @@ import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-lea
 import L from 'leaflet';
 import { 
   MapPin, 
-  Camera, 
   FileText, 
   Send, 
   Shield, 
   Info, 
   AlertTriangle, 
-  CheckCircle2, 
   Download,
-  Code,
-  Database,
-  Lock,
-  Zap,
-  ChevronRight,
   ExternalLink
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
-import { GoogleGenAI, Type } from "@google/genai";
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
