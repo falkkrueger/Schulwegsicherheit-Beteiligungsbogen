@@ -1,0 +1,5 @@
+{
+  "name": "Schulwegsicherheit Kirchlengern",
+  "description": "Bürgerbeteiligungs-Plattform zur Erfassung von Gefahrenstellen auf Schulwegen. Unterstützt digitale Meldungen und KI-gestützte Digitalisierung von analogen Karten.",
+  "requestFramePermissions": ["camera", "geolocation"]
+}
