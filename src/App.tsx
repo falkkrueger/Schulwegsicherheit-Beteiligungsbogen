@@ -78,6 +78,7 @@ export default function App() {
   const [reports, setReports] = useState<Report[]>([]);
   
   const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<L.Map | null>(null);
 
   // Default center: Kirchlengern
   const defaultCenter: [number, number] = [52.2012, 8.6350];
@@ -109,66 +110,123 @@ export default function App() {
     
     setIsProcessing(true);
     try {
-      // Use html2canvas with CORS support for Leaflet tiles
-      const canvas = await html2canvas(mapRef.current, {
-        useCORS: true,
-        allowTaint: false, // Changed to false for better compatibility with some browsers
-        backgroundColor: '#ffffff',
-        scale: 2,
-        logging: false,
-      });
-      const imgData = canvas.toDataURL('image/png');
+      const element = mapRef.current;
+      if (!element) return;
+
+      // --- SNAPSHOT MODE ---
+      const originalWidth = element.style.width;
+      const originalHeight = element.style.height;
+      const originalPosition = element.style.position;
+
+      // Force a stable square size (square maps look great in PDFs and avoid the "squashed" look)
+      element.style.width = '1024px';
+      element.style.height = '1024px'; 
+      element.style.position = 'fixed';
+      element.style.top = '-10000px'; 
+      element.style.left = '-10000px';
+
+      // Force Leaflet to recognize the new size immediately
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.invalidateSize();
+      }
+
+      window.dispatchEvent(new Event('resize'));
       
+      // Give it time to re-render tiles
+      await new Promise(resolve => setTimeout(resolve, 1200));
+
+      const canvas = await html2canvas(element, {
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: '#ffffff',
+        scale: 1,
+        logging: false,
+        width: 1024,
+        height: 1024,
+      });
+      
+      element.style.width = originalWidth;
+      element.style.height = originalHeight;
+      element.style.position = originalPosition;
+      element.style.top = '';
+      element.style.left = '';
+      
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.invalidateSize();
+      }
+      window.dispatchEvent(new Event('resize'));
+
+      const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
       
-      // Calculate aspect ratio to avoid distortion
-      const imgProps = pdf.getImageProperties(imgData);
+      // Fixed 1:1 aspect ratio for the PDF
       const pdfWidth = 170;
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      const pdfHeight = 170; 
+      const xOffset = 20;
       
       // --- Header & Branding ---
-      pdf.setFillColor(220, 38, 38); // red-600
-      pdf.rect(0, 0, pageWidth, 40, 'F');
+      pdf.setFillColor(220, 38, 38); 
+      pdf.rect(0, 0, pageWidth, 45, 'F');
       
       pdf.setTextColor(255, 255, 255);
       pdf.setFontSize(22);
       pdf.setFont('helvetica', 'bold');
-      pdf.text('Schulwegsicherheit Kirchlengern', 20, 25);
+      pdf.text('Schulwegsicherheit Kirchlengern', 20, 28);
       
-      // --- Metadata ---
-      pdf.setTextColor(51, 65, 85); // slate-700
       pdf.setFontSize(10);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(`Export-Datum: ${new Date().toLocaleString('de-DE')}`, 20, 50);
+      pdf.text(`Beteiligungsbogen | Erstellt am: ${new Date().toLocaleDateString('de-DE')}`, 20, 38);
       
       // --- Map Image ---
-      pdf.setDrawColor(226, 232, 240); // slate-200
-      // Adjust box height based on calculated image height
-      pdf.rect(18, 63, 174, pdfHeight + 4);
-      pdf.addImage(imgData, 'PNG', 20, 65, pdfWidth, pdfHeight);
-      pdf.setFontSize(8);
-      pdf.text('Kartenausschnitt der gemeldeten Punkte', 20, 65 + pdfHeight + 3);
+      // Draw a clean frame
+      pdf.setDrawColor(200, 200, 200);
+      pdf.setLineWidth(0.1);
+      pdf.rect(xOffset - 0.5, 59.5, pdfWidth + 1, pdfHeight + 1);
+      
+      // Add the image
+      pdf.addImage(imgData, 'JPEG', xOffset, 60, pdfWidth, pdfHeight);
+      
+      pdf.setTextColor(100, 116, 139);
+      pdf.setFontSize(7);
+      pdf.text('Kartenausschnitt mit Ihren Markierungen', xOffset, 60 + pdfHeight + 4);
 
-      // --- Blank Form Section (For manual filling) ---
-      const formStartY = 65 + pdfHeight + 12;
-      pdf.setFontSize(12);
+      // --- Blank Form Section ---
+      const formStartY = 60 + pdfHeight + 15;
+      pdf.setFontSize(13);
       pdf.setFont('helvetica', 'bold');
       pdf.setTextColor(15, 23, 42);
-      pdf.text('Beteiligungsbogen', 20, formStartY);
-
-      pdf.setFontSize(8);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(100, 116, 139);
-      const instructionText = 'Zeichne deinen Schulweg auf der Karte oben nach. Benutze einen grünen Stift für Wege, auf denen du dich wohlfühlst, und einen roten Stift für Stellen, an denen du dich unwohl fühlst. Schreibe hier unten auf, warum das so ist.';
-      const splitInstructions = pdf.splitTextToSize(instructionText, 170);
-      pdf.text(splitInstructions, 20, formStartY + 6);
+      pdf.text('Ihre Anmerkungen zum Schulweg', 20, formStartY);
 
       pdf.setFontSize(9);
-      const labelY = formStartY + 6 + (splitInstructions.length * 4);
-      pdf.text('Warum hast du diese Stellen so markiert? (Beschreibung):', 20, labelY);
-      // Box from labelY + 2 to 275 (1cm before footer at 285)
-      pdf.rect(20, labelY + 2, 170, Math.max(40, 275 - (labelY + 2))); 
+      pdf.setFont('helvetica', 'normal');
+      pdf.setTextColor(71, 85, 105);
+      const instructionText = 'Bitte beschreiben Sie hier die markierten Stellen. Warum fühlen Sie sich dort (un)sicher? Welche konkreten Verbesserungen schlagen Sie vor?';
+      const splitInstructions = pdf.splitTextToSize(instructionText, 170);
+      pdf.text(splitInstructions, 20, formStartY + 7);
+
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(15, 23, 42);
+      const labelY = formStartY + 12 + (splitInstructions.length * 4);
+      pdf.text('Beschreibung / Begründung:', 20, labelY);
+      
+      // Draw a clean box for handwriting
+      const boxBottom = 275;
+      const boxHeight = boxBottom - (labelY + 3);
+      pdf.setDrawColor(226, 232, 240);
+      pdf.rect(20, labelY + 3, 170, boxHeight); 
+      
+      // Add writing lines
+      pdf.setDrawColor(241, 245, 249);
+      for (let l = labelY + 13; l < (labelY + 3 + boxHeight - 5); l += 8) {
+        pdf.line(25, l, 185, l);
+      }
+
+      // --- Footer ---
+      pdf.setFontSize(8);
+      pdf.setTextColor(148, 163, 184);
+      pdf.text('SPD Kirchlengern - Gemeinsam für Sicherheit', pageWidth / 2, 287, { align: 'center' });
 
       // --- Reports Section (If any exist) ---
       if (reports.length > 0) {
@@ -267,9 +325,14 @@ export default function App() {
         
         {/* Left Column: Map */}
         <div className="md:col-span-7 lg:col-span-8 flex flex-col gap-6">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex-1 min-h-[400px] md:min-h-[500px] relative">
-            <div ref={mapRef} className="absolute inset-0">
-              <MapContainer center={defaultCenter} zoom={15} scrollWheelZoom={true}>
+          <div ref={mapRef} className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden relative aspect-square md:aspect-auto md:flex-1 md:min-h-[500px]">
+            <div className="absolute inset-0">
+              <MapContainer 
+                center={defaultCenter} 
+                zoom={15} 
+                scrollWheelZoom={true}
+                ref={mapInstanceRef}
+              >
                 <TileLayer
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
