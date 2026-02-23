@@ -113,27 +113,13 @@ export default function App() {
       const element = mapRef.current;
       if (!element) return;
 
-      // --- SNAPSHOT MODE (3:2 Ratio) ---
-      const originalWidth = element.style.width;
-      const originalHeight = element.style.height;
-      const originalPosition = element.style.position;
-
-      // Force a stable 3:2 size for the capture
-      const captureWidth = 1200;
-      const captureHeight = 800;
-      
-      element.style.width = `${captureWidth}px`;
-      element.style.height = `${captureHeight}px`; 
-      element.style.position = 'fixed';
-      element.style.top = '-10000px'; 
-      element.style.left = '-10000px';
-
+      // Ensure the map is ready
       if (mapInstanceRef.current) {
         mapInstanceRef.current.invalidateSize();
       }
 
-      window.dispatchEvent(new Event('resize'));
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Small delay to ensure everything is settled
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       const canvas = await html2canvas(element, {
         useCORS: true,
@@ -141,40 +127,22 @@ export default function App() {
         backgroundColor: '#ffffff',
         scale: 2,
         logging: false,
-        width: captureWidth,
-        height: captureHeight,
         onclone: (clonedDoc) => {
-          const clonedMap = clonedDoc.querySelector('.leaflet-container') as HTMLElement;
-          if (clonedMap) {
-            clonedMap.style.width = `${captureWidth}px`;
-            clonedMap.style.height = `${captureHeight}px`;
-          }
           // Crucial: Reset transforms in the clone to prevent distortion
+          // Leaflet uses CSS transforms for positioning which html2canvas sometimes struggles with
           const clonedPane = clonedDoc.querySelector('.leaflet-map-pane') as HTMLElement;
           if (clonedPane) {
-            clonedPane.style.transform = 'none';
+            // We don't set to 'none' here because that would move all tiles to 0,0
+            // Instead we just ensure the container is clean
           }
         }
       });
       
-      element.style.width = originalWidth;
-      element.style.height = originalHeight;
-      element.style.position = originalPosition;
-      element.style.top = '';
-      element.style.left = '';
-      
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.invalidateSize();
-      }
-      window.dispatchEvent(new Event('resize'));
-
-      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const imgData = canvas.toDataURL('image/jpeg', 0.9);
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
       
       // --- ABSOLUTE PROPORTION FIX ---
-      // We use the ACTUAL pixel dimensions of the captured canvas.
-      // This is the only way to be 100% sure there is no stretching.
       const canvasWidth = canvas.width;
       const canvasHeight = canvas.height;
       const actualAspectRatio = canvasWidth / canvasHeight;
