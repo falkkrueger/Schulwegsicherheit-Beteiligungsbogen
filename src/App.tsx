@@ -139,10 +139,17 @@ export default function App() {
         useCORS: true,
         allowTaint: false,
         backgroundColor: '#ffffff',
-        scale: 1,
+        scale: 2,
         logging: false,
         width: captureWidth,
         height: captureHeight,
+        onclone: (clonedDoc) => {
+          const clonedMap = clonedDoc.querySelector('.leaflet-container') as HTMLElement;
+          if (clonedMap) {
+            clonedMap.style.width = `${captureWidth}px`;
+            clonedMap.style.height = `${captureHeight}px`;
+          }
+        }
       });
       
       element.style.width = originalWidth;
@@ -156,13 +163,20 @@ export default function App() {
       }
       window.dispatchEvent(new Event('resize'));
 
-      const imgData = canvas.toDataURL('image/png');
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
       
-      // Fixed 3:2 aspect ratio for the PDF
+      // --- DYNAMIC ASPECT RATIO CALCULATION ---
+      // We use the actual dimensions of the captured canvas to determine the height in the PDF.
+      // This ensures that even if the capture size wasn't exactly what we requested,
+      // the image will not be stretched in the PDF.
+      const canvasWidth = canvas.width;
+      const canvasHeight = canvas.height;
+      const aspectRatio = canvasWidth / canvasHeight;
+      
       const pdfWidth = 170;
-      const pdfHeight = 113.33; // 170 / 1.5
+      const pdfHeight = pdfWidth / aspectRatio;
       const xOffset = 20;
       
       // --- Header & Branding ---
@@ -325,7 +339,7 @@ export default function App() {
         
         {/* Left Column: Map */}
         <div className="md:col-span-7 lg:col-span-8 flex flex-col gap-6">
-          <div ref={mapRef} className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden relative aspect-[3/2] w-full">
+          <div ref={mapRef} className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden relative aspect-[3/2] w-full shadow-lg">
             <div className="absolute inset-0">
               <MapContainer 
                 center={defaultCenter} 
