@@ -133,7 +133,7 @@ export default function App() {
       }
 
       window.dispatchEvent(new Event('resize'));
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 1500));
 
       const canvas = await html2canvas(element, {
         useCORS: true,
@@ -148,6 +148,11 @@ export default function App() {
           if (clonedMap) {
             clonedMap.style.width = `${captureWidth}px`;
             clonedMap.style.height = `${captureHeight}px`;
+          }
+          // Crucial: Reset transforms in the clone to prevent distortion
+          const clonedPane = clonedDoc.querySelector('.leaflet-map-pane') as HTMLElement;
+          if (clonedPane) {
+            clonedPane.style.transform = 'none';
           }
         }
       });
@@ -167,16 +172,15 @@ export default function App() {
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
       
-      // --- DYNAMIC ASPECT RATIO CALCULATION ---
-      // We use the actual dimensions of the captured canvas to determine the height in the PDF.
-      // This ensures that even if the capture size wasn't exactly what we requested,
-      // the image will not be stretched in the PDF.
+      // --- ABSOLUTE PROPORTION FIX ---
+      // We use the ACTUAL pixel dimensions of the captured canvas.
+      // This is the only way to be 100% sure there is no stretching.
       const canvasWidth = canvas.width;
       const canvasHeight = canvas.height;
-      const aspectRatio = canvasWidth / canvasHeight;
+      const actualAspectRatio = canvasWidth / canvasHeight;
       
       const pdfWidth = 170;
-      const pdfHeight = pdfWidth / aspectRatio;
+      const pdfHeight = pdfWidth / actualAspectRatio;
       const xOffset = 20;
       
       // --- Header & Branding ---
@@ -339,7 +343,11 @@ export default function App() {
         
         {/* Left Column: Map */}
         <div className="md:col-span-7 lg:col-span-8 flex flex-col gap-6">
-          <div ref={mapRef} className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden relative aspect-[3/2] w-full shadow-lg">
+          <div 
+            ref={mapRef} 
+            className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden relative w-full"
+            style={{ aspectRatio: '3 / 2' }}
+          >
             <div className="absolute inset-0">
               <MapContainer 
                 center={defaultCenter} 
