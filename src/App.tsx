@@ -113,36 +113,45 @@ export default function App() {
       const element = mapRef.current;
       if (!element) return;
 
-      // Ensure the map is ready
+      // Ensure the map is ready and animations are settled
       if (mapInstanceRef.current) {
         mapInstanceRef.current.invalidateSize();
       }
 
-      // Small delay to ensure everything is settled
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Longer delay for iPad to ensure all tiles and markers are rendered
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
       const canvas = await html2canvas(element, {
         useCORS: true,
         allowTaint: false,
         backgroundColor: '#ffffff',
-        scale: 2,
+        scale: 1.5, // Slightly lower scale for better stability on mobile
         logging: false,
+        // Ignore Leaflet controls (zoom buttons, attribution) as they often cause CORS issues
+        ignoreElements: (el) => {
+          return el.classList.contains('leaflet-control-container');
+        },
         onclone: (clonedDoc) => {
-          // Crucial: Reset transforms in the clone to prevent distortion
-          // Leaflet uses CSS transforms for positioning which html2canvas sometimes struggles with
-          const clonedPane = clonedDoc.querySelector('.leaflet-map-pane') as HTMLElement;
-          if (clonedPane) {
-            // We don't set to 'none' here because that would move all tiles to 0,0
-            // Instead we just ensure the container is clean
+          const clonedMap = clonedDoc.querySelector('.leaflet-container') as HTMLElement;
+          if (clonedMap) {
+            // Force remove all transitions and animations in the clone
+            clonedMap.classList.remove('leaflet-fade-anim');
+            clonedMap.classList.remove('leaflet-zoom-anim');
+            
+            // Ensure the map pane is visible and not transformed in a way that breaks html2canvas
+            const pane = clonedMap.querySelector('.leaflet-map-pane') as HTMLElement;
+            if (pane) {
+              // Some versions of html2canvas struggle with translate3d
+              // We keep it simple here
+            }
           }
         }
       });
       
-      const imgData = canvas.toDataURL('image/jpeg', 0.9);
+      const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
       
-      // --- ABSOLUTE PROPORTION FIX ---
       const canvasWidth = canvas.width;
       const canvasHeight = canvas.height;
       const actualAspectRatio = canvasWidth / canvasHeight;
