@@ -113,27 +113,27 @@ export default function App() {
       const element = mapRef.current;
       if (!element) return;
 
-      // --- SNAPSHOT MODE ---
+      // --- SNAPSHOT MODE (3:2 Ratio) ---
       const originalWidth = element.style.width;
       const originalHeight = element.style.height;
       const originalPosition = element.style.position;
 
-      // Force a stable square size (square maps look great in PDFs and avoid the "squashed" look)
-      element.style.width = '1024px';
-      element.style.height = '1024px'; 
+      // Force a stable 3:2 size for the capture
+      const captureWidth = 1200;
+      const captureHeight = 800;
+      
+      element.style.width = `${captureWidth}px`;
+      element.style.height = `${captureHeight}px`; 
       element.style.position = 'fixed';
       element.style.top = '-10000px'; 
       element.style.left = '-10000px';
 
-      // Force Leaflet to recognize the new size immediately
       if (mapInstanceRef.current) {
         mapInstanceRef.current.invalidateSize();
       }
 
       window.dispatchEvent(new Event('resize'));
-      
-      // Give it time to re-render tiles
-      await new Promise(resolve => setTimeout(resolve, 1200));
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       const canvas = await html2canvas(element, {
         useCORS: true,
@@ -141,8 +141,8 @@ export default function App() {
         backgroundColor: '#ffffff',
         scale: 1,
         logging: false,
-        width: 1024,
-        height: 1024,
+        width: captureWidth,
+        height: captureHeight,
       });
       
       element.style.width = originalWidth;
@@ -160,9 +160,9 @@ export default function App() {
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
       
-      // Fixed 1:1 aspect ratio for the PDF
+      // Fixed 3:2 aspect ratio for the PDF
       const pdfWidth = 170;
-      const pdfHeight = 170; 
+      const pdfHeight = 113.33; // 170 / 1.5
       const xOffset = 20;
       
       // --- Header & Branding ---
@@ -325,7 +325,7 @@ export default function App() {
         
         {/* Left Column: Map */}
         <div className="md:col-span-7 lg:col-span-8 flex flex-col gap-6">
-          <div ref={mapRef} className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden relative aspect-square md:aspect-auto md:flex-1 md:min-h-[500px]">
+          <div ref={mapRef} className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden relative aspect-[3/2] w-full">
             <div className="absolute inset-0">
               <MapContainer 
                 center={defaultCenter} 
